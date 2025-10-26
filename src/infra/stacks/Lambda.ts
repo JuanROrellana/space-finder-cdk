@@ -49,54 +49,25 @@ export class LambdaStack extends Stack {
       })
     );
 
-    const sqlReplicatorLambda = new NodejsFunction(
-      this,
-      "sqlReplicator",
-      {
-        runtime: Runtime.NODEJS_22_X,
-        handler: "handler",
-        entry: join(__dirname, "..", "..", "services", "sqlReplicator.ts"),
-        timeout: Duration.seconds(30),
-        memorySize: 512,
-        environment: {
-          TABLE_NAME: props.spacesTable.tableName,
-          DB_SECRET_ARN: props.dbSecret.secretArn,
-          DB_HOST: props.auroraCluster.clusterEndpoint.hostname,
-          DB_PORT: props.auroraCluster.clusterEndpoint.port.toString(),
-          DB_NAME: "spacefinder",
-          NODE_OPTIONS: "--enable-source-maps",
-        },
-        vpc: props.vpc,
-        vpcSubnets: {
-          subnetType: SubnetType.PRIVATE_WITH_EGRESS,
-        },
-        securityGroups: [props.dbSecurityGroup],
-        bundling: {
-          minify: false,
-          sourceMap: true,
-          // Include Prisma Client in the bundle
-          nodeModules: ["@prisma/client"],
-          commandHooks: {
-            beforeBundling(inputDir: string, outputDir: string): string[] {
-              return [
-                `cd ${inputDir}`,
-                "npx prisma generate",
-              ];
-            },
-            afterBundling(inputDir: string, outputDir: string): string[] {
-              // Copy Prisma schema to Lambda bundle
-              return [
-                `mkdir -p ${outputDir}/prisma`,
-                `cp ${inputDir}/prisma/schema.prisma ${outputDir}/prisma/`,
-              ];
-            },
-            beforeInstall(): string[] {
-              return [];
-            },
-          },
-        },
-      }
-    );
+    const sqlReplicatorLambda = new NodejsFunction(this, "sqlReplicator", {
+      runtime: Runtime.NODEJS_22_X,
+      handler: "handler",
+      entry: join(__dirname, "..", "..", "services", "sqlReplicator.ts"),
+      timeout: Duration.seconds(30),
+      memorySize: 512,
+      environment: {
+        TABLE_NAME: props.spacesTable.tableName,
+        DB_SECRET_ARN: props.dbSecret.secretArn,
+        DB_HOST: props.auroraCluster.clusterEndpoint.hostname,
+        DB_PORT: props.auroraCluster.clusterEndpoint.port.toString(),
+        DB_NAME: "spacefinder",
+      },
+      vpc: props.vpc,
+      vpcSubnets: {
+        subnetType: SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      securityGroups: [props.dbSecurityGroup],
+    });
 
     // Grant access to read the database secret
     props.dbSecret.grantRead(sqlReplicatorLambda);
@@ -104,16 +75,18 @@ export class LambdaStack extends Stack {
     // Allow Lambda to connect to Aurora
     props.auroraCluster.connections.allowDefaultPortFrom(sqlReplicatorLambda);
 
-    sqlReplicatorLambda.addEventSource( new DynamoEventSource(props.spacesTable, {
-      startingPosition: StartingPosition.LATEST,
-      batchSize: 1,
-      enabled: true,
-      bisectBatchOnError: true,
-      reportBatchItemFailures: true,
-      maxBatchingWindow: Duration.seconds(0),
-      maxRecordAge: Duration.seconds(60),
-      retryAttempts: 1,
-    }));
+    sqlReplicatorLambda.addEventSource(
+      new DynamoEventSource(props.spacesTable, {
+        startingPosition: StartingPosition.LATEST,
+        batchSize: 1,
+        enabled: true,
+        bisectBatchOnError: true,
+        reportBatchItemFailures: true,
+        maxBatchingWindow: Duration.seconds(0),
+        maxRecordAge: Duration.seconds(60),
+        retryAttempts: 1,
+      })
+    );
 
     this.spacesLambdaIntegration = new LambdaIntegration(spacesLambda);
     this.sqlReplicatorLambdaIntegration = new LambdaIntegration(

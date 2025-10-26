@@ -19,7 +19,7 @@ interface DataStackProps extends StackProps {
   vpc: Vpc;
   isGlobalPrimary?: boolean;
   globalClusterId?: string;
-  secretReplicaRegions?: string[];
+  // secretReplicaRegions?: string[];
 }
 
 export class DataStack extends Stack {
@@ -43,39 +43,39 @@ export class DataStack extends Stack {
     });
 
     // Create or import multi-region database credentials secret
-    const dbSecret: ISecret = isPrimary
-      ? new Secret(this, "AuroraSecret", {
-          secretName: secretName,
-          generateSecretString: {
-            secretStringTemplate: JSON.stringify({ username: "postgres" }),
-            generateStringKey: "password",
-            excludePunctuation: true,
-            includeSpace: false,
-            passwordLength: 32,
-          },
-          replicaRegions: (props.secretReplicaRegions ?? []).map((region) => ({ region })),
-        })
-      : Secret.fromSecretNameV2(this, "AuroraSecretReplica", secretName);
+    // const dbSecret: ISecret = isPrimary
+    //   ? new Secret(this, `AuroraSecret-${suffix}`, {
+    //       secretName: secretName,
+    //       generateSecretString: {
+    //         secretStringTemplate: JSON.stringify({ username: "postgres" }),
+    //         generateStringKey: "password",
+    //         excludePunctuation: true,
+    //         includeSpace: false,
+    //         passwordLength: 32,
+    //       },
+    //       // replicaRegions: (props.secretReplicaRegions ?? []).map((region) => ({ region })),
+    //     })
+    // : Secret.fromSecretNameV2(this, "AuroraSecretReplica", secretName);
+
+    const dbSecret: ISecret = new Secret(this, `AuroraSecret`, {
+      secretName: secretName,
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({ username: "postgres" }),
+        generateStringKey: "password",
+        excludePunctuation: true,
+        includeSpace: false,
+        passwordLength: 32,
+      },
+    });
 
     // Security group for Aurora cluster
-    const dbSecurityGroup = new SecurityGroup(this, "AuroraSecurityGroup", {
+    const dbSecurityGroup = new SecurityGroup(this, `AuroraSecurityGroup`, {
       vpc: props.vpc,
       description: "Security group for Aurora Serverless v2 cluster",
       allowAllOutbound: true,
     });
 
-    // Create Aurora Global Database (primary creates global cluster) and regional Serverless v2 PostgreSQL cluster
-    const global = isPrimary
-      ? new CfnGlobalCluster(this, "GlobalCluster", {
-          globalClusterIdentifier: globalClusterId,
-          engine: "aurora-postgresql",
-          engineVersion: "16.6",
-          storageEncrypted: true,
-        })
-      : undefined;
-
-    // Create Aurora Serverless v2 PostgreSQL cluster
-    const auroraCluster = new DatabaseCluster(this, "AuroraCluster", {
+    const auroraCluster = new DatabaseCluster(this, `AuroraCluster`, {
       engine: DatabaseClusterEngine.auroraPostgres({
         version: AuroraPostgresEngineVersion.VER_16_6,
       }),
@@ -84,33 +84,60 @@ export class DataStack extends Stack {
       writer: ClusterInstance.serverlessV2("writer", {
         autoMinorVersionUpgrade: true,
       }),
-      readers: [
-        // Optional: Add reader instance for production workloads
-        // ClusterInstance.serverlessV2("reader", {
-        //   scaleWithWriter: true,
-        // }),
-      ],
       vpc: props.vpc,
       vpcSubnets: {
         subnetType: SubnetType.PRIVATE_WITH_EGRESS,
       },
       securityGroups: [dbSecurityGroup],
-      serverlessV2MinCapacity: 0.5, // Minimum for Aurora Serverless v2
-      serverlessV2MaxCapacity: 1, // Adjust based on your needs
-      removalPolicy: RemovalPolicy.SNAPSHOT, // Take snapshot before deletion
-      backup: {
-        retention: require("aws-cdk-lib").Duration.days(7),
-      },
     });
 
-    // Attach regional cluster to the Global Cluster
-    const cfnCluster = auroraCluster.node.defaultChild as CfnDBCluster;
-    cfnCluster.globalClusterIdentifier = global
-      ? (global.globalClusterIdentifier as string)
-      : globalClusterId;
-    if (global) {
-      cfnCluster.addDependency(global);
-    }
+    // // Create Aurora Global Database (primary creates global cluster) and regional Serverless v2 PostgreSQL cluster
+    // const global = isPrimary
+    //   ? new CfnGlobalCluster(this, "GlobalCluster", {
+    //       globalClusterIdentifier: globalClusterId,
+    //       engine: "aurora-postgresql",
+    //       engineVersion: "16.6",
+    //       storageEncrypted: true,
+    //     })
+    //   : undefined;
+
+    // // Create Aurora Serverless v2 PostgreSQL cluster
+    // const auroraCluster = new DatabaseCluster(this, "AuroraCluster", {
+    //   engine: DatabaseClusterEngine.auroraPostgres({
+    //     version: AuroraPostgresEngineVersion.VER_16_6,
+    //   }),
+    //   credentials: Credentials.fromSecret(dbSecret),
+    //   defaultDatabaseName: "spacefinder",
+    //   writer: ClusterInstance.serverlessV2("writer", {
+    //     autoMinorVersionUpgrade: true,
+    //   }),
+    //   readers: [
+    //     // Optional: Add reader instance for production workloads
+    //     // ClusterInstance.serverlessV2("reader", {
+    //     //   scaleWithWriter: true,
+    //     // }),
+    //   ],
+    //   vpc: props.vpc,
+    //   vpcSubnets: {
+    //     subnetType: SubnetType.PRIVATE_WITH_EGRESS,
+    //   },
+    //   securityGroups: [dbSecurityGroup],
+    //   serverlessV2MinCapacity: 0.5, // Minimum for Aurora Serverless v2
+    //   serverlessV2MaxCapacity: 1, // Adjust based on your needs
+    //   removalPolicy: RemovalPolicy.SNAPSHOT, // Take snapshot before deletion
+    //   backup: {
+    //     retention: require("aws-cdk-lib").Duration.days(7),
+    //   },
+    // });
+
+    // // Attach regional cluster to the Global Cluster
+    // const cfnCluster = auroraCluster.node.defaultChild as CfnDBCluster;
+    // cfnCluster.globalClusterIdentifier = global
+    //   ? (global.globalClusterIdentifier as string)
+    //   : globalClusterId;
+    // if (global) {
+    //   cfnCluster.addDependency(global);
+    // }
 
     this.spacesTable = spacesTable;
     this.auroraCluster = auroraCluster;
