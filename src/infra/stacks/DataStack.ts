@@ -84,6 +84,11 @@ export class DataStack extends Stack {
       writer: ClusterInstance.serverlessV2("writer", {
         autoMinorVersionUpgrade: true,
       }),
+      readers: [
+        ClusterInstance.serverlessV2("reader", {
+          autoMinorVersionUpgrade: true,
+        }),
+      ],
       vpc: props.vpc,
       vpcSubnets: {
         subnetType: SubnetType.PRIVATE_WITH_EGRESS,
@@ -103,25 +108,6 @@ export class DataStack extends Stack {
 
     // // Create Aurora Serverless v2 PostgreSQL cluster
     // const auroraCluster = new DatabaseCluster(this, "AuroraCluster", {
-    //   engine: DatabaseClusterEngine.auroraPostgres({
-    //     version: AuroraPostgresEngineVersion.VER_16_6,
-    //   }),
-    //   credentials: Credentials.fromSecret(dbSecret),
-    //   defaultDatabaseName: "spacefinder",
-    //   writer: ClusterInstance.serverlessV2("writer", {
-    //     autoMinorVersionUpgrade: true,
-    //   }),
-    //   readers: [
-    //     // Optional: Add reader instance for production workloads
-    //     // ClusterInstance.serverlessV2("reader", {
-    //     //   scaleWithWriter: true,
-    //     // }),
-    //   ],
-    //   vpc: props.vpc,
-    //   vpcSubnets: {
-    //     subnetType: SubnetType.PRIVATE_WITH_EGRESS,
-    //   },
-    //   securityGroups: [dbSecurityGroup],
     //   serverlessV2MinCapacity: 0.5, // Minimum for Aurora Serverless v2
     //   serverlessV2MaxCapacity: 1, // Adjust based on your needs
     //   removalPolicy: RemovalPolicy.SNAPSHOT, // Take snapshot before deletion
